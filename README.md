@@ -6,8 +6,7 @@
 ---
 
 ## 📺 Project Demo
-*(Because your video is over 10MB, GitHub won't allow you to upload it directly. Please upload your video to YouTube as "Unlisted" or Google Drive, and paste the link here!)*
-> [Watch the Demo Video Here](#)
+https://github.com/user-attachments/assets/23727fe6-c31e-46d9-b2a8-ec7297dae9e7
 
 ## 🗺️ The n8n Workflow & Interface
 ![Home Page](./home%20page.png)
