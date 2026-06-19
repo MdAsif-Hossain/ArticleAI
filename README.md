@@ -6,12 +6,13 @@
 ---
 
 ## 📺 Project Demo
-*(Upload your demo video to a GitHub Issue, then copy the link and paste it here!)*
+*(Because your video is over 10MB, GitHub won't allow you to upload it directly. Please upload your video to YouTube as "Unlisted" or Google Drive, and paste the link here!)*
 > [Watch the Demo Video Here](#)
 
-## 🗺️ The n8n Workflow
-*(Take a screenshot of your beautiful n8n canvas, upload it to a GitHub issue, and paste the image link here!)*
-> ![Workflow Screenshot](#)
+## 🗺️ The n8n Workflow & Interface
+![Home Page](./home%20page.png)
+<br>
+![Workflow Screenshot](./workflow.png)
 
 ---
 
