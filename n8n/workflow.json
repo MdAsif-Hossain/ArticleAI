@@ -1,0 +1,226 @@
+{
+  "name": "AI Article Analyzer Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "process-article",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "node-webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "webhookId": "process-article"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.body.article_url }}",
+        "options": {}
+      },
+      "id": "node-scrape",
+      "name": "Scrape Article",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract readable text from raw HTML\nconst html = $input.first().json.data || $input.first().json.body || JSON.stringify($input.first().json);\nconst text = String(html)\n  .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, '')\n  .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, '')\n  .replace(/<[^>]+>/g, ' ')\n  .replace(/&[a-z]+;/gi, ' ')\n  .replace(/\\s+/g, ' ')\n  .trim();\n\nreturn [{\n  json: {\n    text: text.substring(0, 12000),\n    session_id: $('Webhook').first().json.body.session_id,\n    email: $('Webhook').first().json.body.email,\n    article_url: $('Webhook').first().json.body.article_url,\n    callback_url: $('Webhook').first().json.body.callback_url\n  }\n}];"
+      },
+      "id": "node-extract",
+      "name": "Extract Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.GROQ_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a helpful AI assistant. Summarize the following article text into 3 to 5 clear, concise sentences. Only output the summary, nothing else.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": {{ JSON.stringify($json.text) }}\n    }\n  ],\n  \"temperature\": 0.5\n}",
+        "options": {}
+      },
+      "id": "node-summarize",
+      "name": "AI Summarize",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.GROQ_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Extract exactly 3 to 5 key insights from the following article text. Return each insight on its own line, prefixed with a dash (-). Only output the insights, nothing else.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": {{ JSON.stringify($('Extract Text').first().json.text) }}\n    }\n  ],\n  \"temperature\": 0.5\n}",
+        "options": {}
+      },
+      "id": "node-insights",
+      "name": "AI Insights",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 420]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge results from both AI calls\nconst summary  = $('AI Summarize').first().json.choices[0].message.content;\nconst insights = $('AI Insights').first().json.choices[0].message.content;\nconst meta     = $('Extract Text').first().json;\n\nreturn [{\n  json: {\n    session_id:   meta.session_id,\n    email:        meta.email,\n    article_url:  meta.article_url,\n    callback_url: meta.callback_url,\n    summary,\n    insights\n  }\n}];"
+      },
+      "id": "node-merge",
+      "name": "Merge Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 300]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "PASTE_YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "SessionID": "={{ $json.session_id }}",
+            "Email": "={{ $json.email }}",
+            "URL": "={{ $json.article_url }}",
+            "Summary": "={{ $json.summary }}",
+            "Insights": "={{ $json.insights }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "node-sheets",
+      "name": "Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1320, 200],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_YOUR_GOOGLE_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "your-email@gmail.com",
+        "toEmail": "={{ $('Merge Results').first().json.email }}",
+        "subject": "Your Article Analysis Results — ArticleAI",
+        "html": "=<div style=\"font-family:sans-serif;max-width:600px;margin:auto;\">\n<h2 style=\"color:#38bdf8;\">Article Analysis Results</h2>\n<p><strong>Article:</strong> <a href=\"{{ $('Merge Results').first().json.article_url }}\">{{ $('Merge Results').first().json.article_url }}</a></p>\n<hr>\n<h3>Summary</h3>\n<p>{{ $('Merge Results').first().json.summary }}</p>\n<hr>\n<h3>Key Insights</h3>\n<p style=\"white-space:pre-line;\">{{ $('Merge Results').first().json.insights }}</p>\n<hr>\n<p style=\"color:#999;font-size:12px;\">Powered by ArticleAI - FastAPI - n8n - Groq</p>\n</div>",
+        "options": {}
+      },
+      "id": "node-email",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1320, 420],
+      "credentials": {
+        "smtp": {
+          "id": "PASTE_YOUR_SMTP_CREDENTIAL_ID",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Merge Results').first().json.callback_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Bypass-Tunnel-Reminder",
+              "value": "true"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"session_id\": \"{{ $('Merge Results').first().json.session_id }}\",\n  \"summary\": {{ JSON.stringify($('Merge Results').first().json.summary) }},\n  \"insights\": {{ JSON.stringify($('Merge Results').first().json.insights) }},\n  \"status\": \"completed\"\n}",
+        "options": {}
+      },
+      "id": "node-callback",
+      "name": "Callback Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [{ "node": "Scrape Article", "type": "main", "index": 0 }]
+      ]
+    },
+    "Scrape Article": {
+      "main": [
+        [{ "node": "Extract Text", "type": "main", "index": 0 }]
+      ]
+    },
+    "Extract Text": {
+      "main": [
+        [
+          { "node": "AI Summarize", "type": "main", "index": 0 },
+          { "node": "AI Insights", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "AI Summarize": {
+      "main": [
+        [{ "node": "Merge Results", "type": "main", "index": 0 }]
+      ]
+    },
+    "AI Insights": {
+      "main": [
+        [{ "node": "Merge Results", "type": "main", "index": 0 }]
+      ]
+    },
+    "Merge Results": {
+      "main": [
+        [
+          { "node": "Google Sheets", "type": "main", "index": 0 },
+          { "node": "Send Email", "type": "main", "index": 0 },
+          { "node": "Callback Backend", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  }
+}
