@@ -6,7 +6,7 @@
 ---
 
 ## 📺 Project Demo
-https://github.com/user-attachments/assets/23727fe6-c31e-46d9-b2a8-ec7297dae9e7
+https://github.com/user-attachments/assets/73556858-0870-4724-bb2c-dc4408dbc652
 
 ## 🗺️ The n8n Workflow & Interface
 ![Home Page](./home%20page.png)
